@@ -148,7 +148,7 @@ public class SocketProcess implements Runnable {
             out.println((moveQuant.x*-1) + "," + (moveQuant.y*-1));
 
             if(!pendingMoves.isEmpty()) {
-                moveQuants.add(pendingMoves.getLast());
+                moveQuants.add(pendingMoves.getFirst());
             }
         } catch (InterruptedException e) {
             e.printStackTrace();
