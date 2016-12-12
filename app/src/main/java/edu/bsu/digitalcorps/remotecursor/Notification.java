@@ -2,6 +2,7 @@ package edu.bsu.digitalcorps.remotecursor;
 
 import android.content.Context;
 import android.graphics.Typeface;
+import android.util.Log;
 import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
@@ -20,6 +21,9 @@ public class Notification extends LinearLayout implements View.OnTouchListener {
     private static final int MIN_HEIGHT = 90;
     private TextView text;
 
+    protected float xInLayout;
+    protected float yInLayout;
+
     private Notification(Context context, String message) {
         super(context);
 
@@ -29,7 +33,7 @@ public class Notification extends LinearLayout implements View.OnTouchListener {
         int padding = convertToDip(5);
         setPadding(padding, padding, padding, padding);
         setLayoutParams(layoutParams);
-//        layoutParams.setMargins(0, 0, 0, convertToDip(10));
+        layoutParams.setMargins(0, 0, 0, convertToDip(10));
         setMinimumHeight(convertToDip(MIN_HEIGHT));
 
         LinearLayout.LayoutParams textParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
@@ -42,13 +46,14 @@ public class Notification extends LinearLayout implements View.OnTouchListener {
         setOnTouchListener(this);
     }
 
-    float dX, originalX;
+    float dX, originalX, originalY;
 
     @Override
     public boolean onTouch(final View view, MotionEvent event) {
         switch (event.getAction()) {
             case MotionEvent.ACTION_DOWN:
                 originalX = view.getX();
+                originalY = view.getY();
                 dX = view.getX() - event.getRawX();
                 break;
 
@@ -64,7 +69,7 @@ public class Notification extends LinearLayout implements View.OnTouchListener {
                     changeX = changeX*-1;
                 }
                 if(changeX > .7*(view.getWidth())) {
-                    exitAnimation(view);
+                    exitAnimation(view, originalX, originalY);
 ;                } else {
                     view.animate()
                             .x(originalX)
@@ -110,7 +115,7 @@ public class Notification extends LinearLayout implements View.OnTouchListener {
         return (int) (px * scale + 0.5f);
     }
 
-    private void exitAnimation(final View view) {
+    private void exitAnimation(final View view, float previousX, float previousY) {
         AlphaAnimation fade = new AlphaAnimation(1, 0);
         TranslateAnimation move = new TranslateAnimation(TranslateAnimation.RELATIVE_TO_PARENT, 0.0f, TranslateAnimation.RELATIVE_TO_PARENT, 1.0f, TranslateAnimation.RELATIVE_TO_SELF, 0.0f, TranslateAnimation.RELATIVE_TO_SELF, 0.0f);
         final AnimationSet animations = new AnimationSet(true);
@@ -137,14 +142,46 @@ public class Notification extends LinearLayout implements View.OnTouchListener {
         animations.addAnimation(move);
         animations.setDuration(500);
         view.startAnimation(animations);
-        replaceAnimation(nextViews);
+
+//        for(int i = 0; i < nextViews.size(); i++) {
+//            View nextView = nextViews.get(i);
+//            float currentX = nextView.getX();
+//            float currentY = nextView.getY();
+//            if(i == 0) {
+//                replaceAnimation(nextView, previousX, previousY, view);
+//            } else {
+//                replaceAnimation(nextView, previousX, previousY, null);
+//            }
+//            previousX = currentX;
+//            previousY = currentY;
+//        }
+
+        for(View nextView : nextViews) {
+            float currentX = nextView.getX();
+            float currentY = nextView.getY();
+            replaceAnimation(nextView, previousX, previousY);
+            previousX = currentX;
+            previousY = currentY;
+        }
     }
 
-    private void replaceAnimation(ArrayList<View> views) {
-        TranslateAnimation move = new TranslateAnimation(TranslateAnimation.RELATIVE_TO_PARENT, 0.0f, TranslateAnimation.RELATIVE_TO_PARENT, 0.0f, TranslateAnimation.RELATIVE_TO_SELF, 0.0f, TranslateAnimation.RELATIVE_TO_SELF, -1.0f);
+    private void replaceAnimation(final View view, final float x, final float y) {
+        float currentHeightPercentage = (((ViewGroup)view.getParent()).getHeight()/view.getY())/100;
+        float nextHeightPercentage = (((ViewGroup)view.getParent()).getHeight()/y)/100;
+//        Log.i("Notification", "Current height: " + currentHeightPercentage + ", next height: " + nextHeightPercentage);
+        TranslateAnimation move = new TranslateAnimation(TranslateAnimation.RELATIVE_TO_PARENT, 0.0f, TranslateAnimation.RELATIVE_TO_PARENT, 0.0f, TranslateAnimation.RELATIVE_TO_SELF, 0.0f, TranslateAnimation.RELATIVE_TO_SELF, -1.2f);
         move.setDuration(500);
-        for(View view : views) {
-            view.startAnimation(move);
-        }
+        move.setAnimationListener(new Animation.AnimationListener() {
+            @Override
+            public void onAnimationStart(Animation animation) {}
+            @Override
+            public void onAnimationEnd(Animation animation) {
+                view.setX(x);
+                view.setY(y);
+            }
+            @Override
+            public void onAnimationRepeat(Animation animation) {}
+        });
+        view.startAnimation(move);
     }
 }

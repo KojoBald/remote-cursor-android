@@ -14,7 +14,6 @@ public abstract class RemoteCursorActivity extends AppCompatActivity {
     private static final int NOTIFICATION_MARGIN = 10;
     public RelativeLayout notificationsContainer;
 
-//    private BlockingQueue<Notification> pendingNotifications = new ArrayBlockingQueue<>(1);
     private LinkedList<Notification> pendingNotifications = new LinkedList<>();
 
     @Override
@@ -43,15 +42,12 @@ public abstract class RemoteCursorActivity extends AppCompatActivity {
 
     private void addNotificationsToView() {
         Notification notification = pendingNotifications.peek();
-        Log.i("RemoteCursorActivity","showing notification");
         View lastNotification = notificationsContainer.getChildAt(notificationsContainer.getChildCount()-1);
         float newX = 0, newY = 0, heightPercentage = 0;
         if(lastNotification != null) {
-            newX = lastNotification.getX();
             newY = lastNotification.getY() + lastNotification.getHeight() + convertToDip(NOTIFICATION_MARGIN);
 
             heightPercentage = (notificationsContainer.getHeight()/newY)/100;
-            Log.i("Notification", heightPercentage + "");
         }
 
         TranslateAnimation addAnimation = new TranslateAnimation(Animation.RELATIVE_TO_PARENT, 0.0f, Animation.RELATIVE_TO_PARENT, 0.0f, Animation.RELATIVE_TO_PARENT, 1.0f, Animation.RELATIVE_TO_PARENT, heightPercentage);
@@ -61,9 +57,10 @@ public abstract class RemoteCursorActivity extends AppCompatActivity {
             public void onAnimationStart(Animation animation) {}
             @Override
             public void onAnimationEnd(Animation animation) {
-                Log.i("Notification", "Animation ending");
+                Notification notificationJustAdded = pendingNotifications.poll();
+                notificationJustAdded.xInLayout = notificationJustAdded.getX();
+                notificationJustAdded.yInLayout = notificationJustAdded.getY();
                 if(!pendingNotifications.isEmpty()) {
-                    Log.i("Notification", "adding another notification");
                     addNotificationsToView();
                 }
             }
