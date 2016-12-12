@@ -1,3 +1,8 @@
 <resources>
     <string name="app_name">RemoteCursor</string>
+    <string name="desktop_connect">Click to connect to your desktop.</string>
+    <string name="desktop_disconnect">Click to disconnect from your desktop.</string>
+    <string name="connect">Connect</string>
+    <string name="disconnect">Disconnect</string>
+    <string name="server_message">Message from server:</string>
 </resources>

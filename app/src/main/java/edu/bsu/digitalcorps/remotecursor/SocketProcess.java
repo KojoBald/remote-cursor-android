@@ -1,6 +1,5 @@
 package edu.bsu.digitalcorps.remotecursor;
 
-import android.app.Activity;
 import android.util.Log;
 import android.widget.Toast;
 
@@ -11,8 +10,6 @@ import java.io.PrintWriter;
 import java.net.Socket;
 import java.net.UnknownHostException;
 import java.util.Date;
-import java.util.LinkedList;
-import java.util.Queue;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 
@@ -28,33 +25,41 @@ public class SocketProcess implements Runnable {
     private BufferedReader in;
     private PrintWriter out;
 
-    private Activity parent;
-    private LinkedList<MoveQuantity> pendingMoves;
+    public RemoteCursorActivity parent;
     private BlockingQueue<MoveQuantity> moveQuants;
 
-    public SocketProcess(Activity context) {
-        this.parent = context;
+    private Runnable onConnectionEstablished;
+
+
+    public SocketProcess() {
         timeout = 15000;
         retryAttempts = 5;
-        pendingMoves = new LinkedList<>();
         moveQuants = new ArrayBlockingQueue<>(1);
     }
 
-    public SocketProcess(Activity context, long timeout, int retryAttempts) {
-        this.parent = context;
+    public SocketProcess(long timeout, int retryAttempts) {
         this.timeout = timeout;
         this.retryAttempts = retryAttempts;
-        pendingMoves = new LinkedList<>();
         moveQuants = new ArrayBlockingQueue<>(1);
+    }
+
+    protected void setConnectionCallback(Runnable connectionCallback) {
+        onConnectionEstablished = connectionCallback;
     }
 
     public void addMove(MoveQuantity moveQuantity) {
-        boolean didAdd = false;
-        if(moveQuants.isEmpty()) {
-            didAdd = moveQuants.offer(moveQuantity);
-        }
-        if(!didAdd) {
-            pendingMoves.add(moveQuantity);
+        moveQuants.offer(moveQuantity);
+    }
+
+    protected void disconnectSocket(Runnable onDisconnect) {
+        try {
+            socket.close();
+            onDisconnect.run();
+        } catch (IOException e) {
+            Log.wtf("SocketProcess","I/O error when disconnecting socket");
+            Notification notification = Notification.createErrorNotification(parent, "I/O error when disconnecting socket");
+            showNotification(notification);
+            e.printStackTrace();
         }
     }
 
@@ -67,16 +72,21 @@ public class SocketProcess implements Runnable {
                 break;
             } else {
                 attempts++;
-                showToast("Could not establish socket connection. Retrying in " + timeout / 1000 + " seconds.");
+                Notification notification = Notification.createErrorNotification(parent, "Could not establish socket connection. Retrying in " + timeout / 1000 + " seconds.");
+                showNotification(notification);
                 waitForRetry();
             }
         }
         if(attempts == retryAttempts) {
-            showToast("Could not establish socket connection.");
+            Notification notification = Notification.createErrorNotification(parent, "Could not establish socket connection.");
+            showNotification(notification);
             return;
         }
         boolean connectionAccepted = connectionProtocol();
         if(connectionAccepted) {
+            if(onConnectionEstablished != null) {
+                parent.runOnUiThread(onConnectionEstablished);
+            }
             maintainConnection();
         }
     }
@@ -98,10 +108,14 @@ public class SocketProcess implements Runnable {
             return true;
         } catch (UnknownHostException e) {
             Log.wtf("SocketProcess","Could not resolve host");
+            Notification notification = Notification.createErrorNotification(parent, "Could not resolve host");
+            showNotification(notification);
             e.printStackTrace();
             return false;
         } catch (IOException e) {
             Log.wtf("SocketProcess","Could not establish socket connection");
+            Notification notification = Notification.createErrorNotification(parent, "Could not establish socket connection");
+            showNotification(notification);
             e.printStackTrace();
             return false;
         }
@@ -110,18 +124,24 @@ public class SocketProcess implements Runnable {
     private boolean connectionProtocol() {
         try {
             String initialServerMessage = in.readLine();
-            showServerMessageToast(initialServerMessage);
+            Notification notification = Notification.createServerNotification(parent, initialServerMessage);
+            showNotification(notification);
         } catch (IOException e) {
             Log.wtf("SocketProcess","Could not read initial server message");
+            Notification notification = Notification.createErrorNotification(parent, "Could not read initial server message.");
+            showNotification(notification);
             e.printStackTrace();
             return false;
         }
         out.println(API_KEY);
         try {
             String secondServerMessage = in.readLine();
-            showServerMessageToast(secondServerMessage);
+            Notification notification = Notification.createServerNotification(parent, secondServerMessage);
+            showNotification(notification);
         } catch (IOException e) {
             Log.wtf("SocketProcess","Could not read second server message");
+            Notification notification = Notification.createErrorNotification(parent, "Could not read second server message");
+            showNotification(notification);
             e.printStackTrace();
             return false;
         }
@@ -146,26 +166,27 @@ public class SocketProcess implements Runnable {
         try {
             MoveQuantity moveQuant = moveQuants.take();
             out.println((moveQuant.x*-1) + "," + (moveQuant.y*-1));
-
-            if(!pendingMoves.isEmpty()) {
-                moveQuants.add(pendingMoves.getFirst());
-            }
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
 
     }
 
-    private void showToast(final String message) {
+    private void showNotification(final Notification notification) {
         parent.runOnUiThread(new Runnable() {
             @Override
             public void run() {
-                Toast.makeText(parent.getBaseContext(), message, Toast.LENGTH_LONG).show();
+                ((RemoteCursor)parent.getApplication()).showNotification(notification);
             }
         });
     }
 
-    private void showServerMessageToast(String message) {
-        showToast("Message from the server: " + message);
-    }
+//    private void showServerNotification(String message) {
+//        parent.runOnUiThread(new Runnable() {
+//            @Override
+//            public void run() {
+//                Notification notification = Notification.createServerNotification()
+//            }
+//        });
+//    }
 }
